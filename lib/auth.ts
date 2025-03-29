@@ -69,21 +69,28 @@ export const authOptions: NextAuthOptions = {
 
       return session
     },
-    async jwt({ token }) {
-      if (!token.sub) return token
-
-      const existingUser = await prisma.user.findUnique({
+    async jwt({ token, user }) {
+      const dbUser = await prisma.user.findFirst({
         where: {
-          id: token.sub,
+          email: token.email,
         },
       })
 
-      if (!existingUser) return token
+      if (!dbUser) {
+        if (user) {
+          token.id = user.id
+        }
+        return token
+      }
 
-      token.role = existingUser.role
-
-      return token
+      return {
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email,
+        picture: dbUser.image,
+      }
     },
+
     async signIn({ user, account }) {
       // For Google authentication, create a subscription if it doesn't exist
       if (account?.provider === "google" && user.id) {
