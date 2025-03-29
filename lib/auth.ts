@@ -90,27 +90,6 @@ export const authOptions: NextAuthOptions = {
         picture: dbUser.image,
       }
     },
-
-    async signIn({ user, account }) {
-      // For Google authentication, create a subscription if it doesn't exist
-      if (account?.provider === "google" && user.id) {
-        const existingSubscription = await prisma.subscription.findUnique({
-          where: { userId: user.id },
-        })
-
-        if (!existingSubscription) {
-          await prisma.subscription.create({
-            data: {
-              userId: user.id,
-              plan: "FREE",
-              status: "ACTIVE",
-            },
-          })
-        }
-      }
-
-      return true
-    },
   },
   session: {
     strategy: "jwt",
