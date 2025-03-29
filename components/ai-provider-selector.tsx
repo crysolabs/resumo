@@ -36,7 +36,7 @@ export function AIProviderSelector({
     // Fetch available providers
     const fetchProviders = async () => {
       try {
-        const providers = await fetch("/api/ai/providers").then((res) =>
+        const providers = await fetch("/api/providers").then((res) =>
           res.json()
         );
         setAvailableProviders(providers);

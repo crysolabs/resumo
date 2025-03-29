@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import DashboardSidebar from "@/components/dashboard-sidebar"
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <DashboardSidebar />
@@ -9,6 +9,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <main className="p-6 md:p-10">{children}</main>
       </div>
     </div>
-  )
+  );
 }
 
