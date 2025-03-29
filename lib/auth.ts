@@ -13,6 +13,13 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+        },
+      },
     }),
     CredentialsProvider({
       name: "credentials",
@@ -47,12 +54,9 @@ export const authOptions: NextAuthOptions = {
   ],
   pages: {
     signIn: "/login",
+    signOut: "/",
+    error: "/login",
   },
-  debug: process.env.NODE_ENV === "development",
-  session: {
-    strategy: "jwt",
-  },
-  secret: process.env.NEXT_PUBLIC_SECRET,
   callbacks: {
     async session({ session, token }) {
       if (token.sub && session.user) {
@@ -80,6 +84,31 @@ export const authOptions: NextAuthOptions = {
 
       return token
     },
+    async signIn({ user, account }) {
+      // For Google authentication, create a subscription if it doesn't exist
+      if (account?.provider === "google" && user.id) {
+        const existingSubscription = await prisma.subscription.findUnique({
+          where: { userId: user.id },
+        })
+
+        if (!existingSubscription) {
+          await prisma.subscription.create({
+            data: {
+              userId: user.id,
+              plan: "FREE",
+              status: "ACTIVE",
+            },
+          })
+        }
+      }
+
+      return true
+    },
   },
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 }
 

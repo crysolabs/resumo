@@ -1,8 +1,17 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { FileText, Home, LogOut, PenTool, Settings, Star, User } from "lucide-react"
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  FileText,
+  Home,
+  LogOut,
+  PenTool,
+  Settings,
+  Star,
+  User,
+} from "lucide-react";
+import { signOut } from "next-auth/react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,15 +22,21 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
+  const router = useRouter();
 
   const isActive = (path: string) => {
-    return pathname === path || pathname?.startsWith(`${path}/`)
-  }
+    return pathname === path || pathname?.startsWith(`${path}/`);
+  };
+
+  const handleSignOut = async () => {
+    await signOut({ redirect: false });
+    router.push("/");
+  };
 
   return (
     <SidebarProvider>
@@ -37,7 +52,10 @@ export default function DashboardSidebar() {
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={isActive("/dashboard")}>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive("/dashboard") && pathname === "/dashboard"}
+              >
                 <Link href="/dashboard">
                   <Home className="h-5 w-5" />
                   <span>Dashboard</span>
@@ -46,7 +64,10 @@ export default function DashboardSidebar() {
             </SidebarMenuItem>
 
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={isActive("/dashboard/resume-builder")}>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive("/dashboard/resume-builder")}
+              >
                 <Link href="/dashboard/resume-builder">
                   <FileText className="h-5 w-5" />
                   <span>Resume Builder</span>
@@ -55,7 +76,10 @@ export default function DashboardSidebar() {
             </SidebarMenuItem>
 
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={isActive("/dashboard/cover-letter")}>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive("/dashboard/cover-letter")}
+              >
                 <Link href="/dashboard/cover-letter">
                   <PenTool className="h-5 w-5" />
                   <span>Cover Letter</span>
@@ -64,7 +88,10 @@ export default function DashboardSidebar() {
             </SidebarMenuItem>
 
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={isActive("/dashboard/profile")}>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive("/dashboard/profile")}
+              >
                 <Link href="/dashboard/profile">
                   <User className="h-5 w-5" />
                   <span>Profile</span>
@@ -84,15 +111,16 @@ export default function DashboardSidebar() {
         </SidebarContent>
 
         <SidebarFooter className="p-4">
-          <Button variant="outline" className="w-full justify-start" asChild>
-            <Link href="/">
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </Link>
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={handleSignOut}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
           </Button>
         </SidebarFooter>
       </Sidebar>
     </SidebarProvider>
-  )
+  );
 }
-
