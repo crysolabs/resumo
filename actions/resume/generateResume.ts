@@ -40,23 +40,61 @@ const resumeSchema = z.object({
   aiProvider: z.string().optional(),
 })
 
-export async function generateResume(formData: FormData) {
+export async function generateResume({
+  personalInfo,
+  experiences,
+  education,
+  skills,
+  selectedProvider,
+
+}: {
+  personalInfo: {
+    name: string;
+    email: string;
+    phone: string;
+    location: string;
+    title: string;
+    summary: string;
+  },
+  experiences:
+  {
+    company: string;
+    title: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+  }[],
+  education: {
+    school: string;
+    degree: string;
+    field: string;
+    startDate: string;
+    endDate: string;
+  }[],
+  skills: string,
+  selectedProvider: "OPENAI" | "MODELSLAB"
+}) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return { error: "You must be logged in to generate a resume" }
     }
 
     // Get user subscription
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { email: session.user.email },
       include: { subscription: true },
     })
+
+    // Use safer logging approach
+    console.log("Session:", session ? { ...session, user: session.user ? { id: session.user.id, email: session.user.email } : null } : null)
+    console.log("User:", user ? { id: user.id, email: user.email, hasSubscription: !!user.subscription } : null)
 
     if (!user) {
       return { error: "User not found" }
     }
+
+    console.log("User subscription status:", user.subscription ? "Active" : "None")
 
     // Check if user is on free plan and has reached the limit
     if (!isUserPro(user.subscription)) {
@@ -72,20 +110,21 @@ export async function generateResume(formData: FormData) {
       }
     }
 
-    // Parse form data
-    const personalInfo = JSON.parse(formData.get("personalInfo") as string)
-    const experiences = JSON.parse(formData.get("experiences") as string)
-    const education = JSON.parse(formData.get("education") as string)
-    const skills = formData.get("skills") as string
-    const aiProvider = (formData.get("aiProvider") as string) || getDefaultProvider()
-
     const validatedData = resumeSchema.parse({
       personalInfo,
       experiences,
       education,
       skills,
-      aiProvider,
+      selectedProvider,
     })
+
+    console.log("Validated data:", JSON.stringify({
+      personalInfoName: validatedData.personalInfo.name,
+      experiencesCount: validatedData.experiences.length,
+      educationCount: validatedData.education.length,
+      hasSkills: !!validatedData.skills,
+      provider: selectedProvider
+    }))
 
     // Generate resume content using the selected AI provider
     const { content, aiScore } = await generateResumeContent(
@@ -93,7 +132,7 @@ export async function generateResume(formData: FormData) {
       validatedData.experiences,
       validatedData.education,
       validatedData.skills || "",
-      aiProvider as AIProviderId,
+      selectedProvider as AIProviderId,
     )
 
     // Create resume in database
@@ -106,9 +145,9 @@ export async function generateResume(formData: FormData) {
           education,
           skills,
           generatedContent: content,
-          aiProvider: aiProvider,
+          aiProvider: selectedProvider,
         },
-        userId: session.user.id,
+        userId: user.id,
         aiGenerated: true,
         aiScore,
       },
@@ -120,7 +159,8 @@ export async function generateResume(formData: FormData) {
       aiScore,
     }
   } catch (error) {
-    console.error("Error generating resume:", error)
+    // Safe error logging that handles circular references and null values
+    console.error("Error generating resume:", error instanceof Error ? error.message : String(error))
 
     if (error instanceof z.ZodError) {
       return { error: error.errors[0].message }
@@ -129,4 +169,3 @@ export async function generateResume(formData: FormData) {
     return { error: "Failed to generate resume. Please try again." }
   }
 }
-

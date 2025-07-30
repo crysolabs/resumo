@@ -19,13 +19,13 @@ import { WelcomeBanner } from "@/components/dashboard/welcome-banner"
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.id) {
-    redirect("/login")
+  if (!session?.user?.email) {
+    redirect("/login");
   }
 
   // Get user data with subscription
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { email: session.user.email },
     include: { subscription: true },
   })
 

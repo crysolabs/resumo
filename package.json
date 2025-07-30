@@ -56,7 +56,9 @@
     "next": "15.1.0",
     "next-auth": "latest",
     "next-themes": "latest",
+    "officegen": "^0.6.5",
     "openai": "latest",
+    "pdfkit": "^0.16.0",
     "prisma": "latest",
     "react": "^18",
     "react-day-picker": "8.10.1",
@@ -73,6 +75,7 @@
   },
   "devDependencies": {
     "@types/node": "^22",
+    "@types/pdfkit": "^0.13.9",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8",

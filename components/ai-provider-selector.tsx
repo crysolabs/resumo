@@ -51,6 +51,7 @@ export function AIProviderSelector({
   }, []);
 
   const handleProviderChange = (value: string) => {
+    console.log(value)
     const provider = value as AIProviderId;
     setSelectedProvider(provider);
     onProviderChange(provider);
@@ -59,6 +60,8 @@ export function AIProviderSelector({
   if (availableProviders.length <= 1) {
     return null; // Don't show selector if only one provider is available
   }
+
+  console.log(availableProviders);
 
   return (
     <div className={className}>

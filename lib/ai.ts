@@ -4,40 +4,132 @@ import { type AIProviderId, getDefaultProvider } from "./ai-providers"
 
 // ModelsLab API client (simplified implementation)
 class ModelsLabClient {
-    private apiKey: string
+    private apiKey: string;
 
     constructor(apiKey: string) {
-        this.apiKey = apiKey
+        this.apiKey = apiKey;
     }
 
+    /**
+     * Generate a response using the ModelsLab uncensored chat API
+     * @param options.prompt The user message to send
+     * @param options.systemPrompt Optional system prompt to set context
+     * @param options.maxTokens Maximum number of tokens in the response (default: 1000)
+     * @param options.previousMessages Optional previous conversation history
+     * @returns The generated response text
+     */
     async generateCompletion(options: {
-        prompt: string
-        systemPrompt?: string
-        format?: string
-    }) {
-        const { prompt, systemPrompt, format } = options
+        prompt: string;
+        systemPrompt?: string;
+        maxTokens?: number;
+        previousMessages?: Array<{ role: string, content: string }>;
+    }): Promise<string> {
+        const { prompt, systemPrompt, maxTokens = 1000, previousMessages = [] } = options;
 
-        const response = await fetch("https://api.modelslab.com/v1/completions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${this.apiKey}`,
-            },
-            body: JSON.stringify({
-                model: "modelslab-latest",
-                prompt,
-                system: systemPrompt,
-                response_format: format === "json" ? { type: "json_object" } : undefined,
-                max_tokens: 2000,
-            }),
-        })
+        // Construct messages array according to the API format
+        const messages = [];
 
-        if (!response.ok) {
-            throw new Error(`ModelsLab API error: ${response.status}`)
+        // Add system message if provided
+        if (systemPrompt) {
+            messages.push({
+                role: "system",
+                content: systemPrompt
+            });
         }
 
-        const data = await response.json()
-        return data.choices[0].text
+        // Add previous messages if any
+        if (previousMessages.length > 0) {
+            messages.push(...previousMessages);
+        }
+
+        // Add the current user prompt
+        messages.push({
+            role: "user",
+            content: prompt
+        });
+
+        try {
+            const response = await fetch("https://modelslab.com/api/v6/llm/uncensored_chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    key: this.apiKey,
+                    messages: messages,
+                    max_tokens: maxTokens
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`ModelsLab API error: ${response.status} - ${JSON.stringify(errorData)}`);
+            }
+
+            const data = await response.json();
+
+            if (data.status !== "success") {
+                throw new Error(`ModelsLab API error: ${data.message || "Unknown error"}`);
+            }
+
+            return data.message;
+        } catch (error) {
+            console.error("Error calling ModelsLab API:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Continue a conversation with the ModelsLab API
+     * @param conversation Array of message objects with role and content
+     * @param maxTokens Maximum number of tokens in the response
+     * @returns The full API response including the new assistant message
+     */
+    async continueConversation(
+        conversation: Array<{ role: string, content: string }>,
+        maxTokens: number = 1000
+    ): Promise<{
+        message: string,
+        conversation: Array<{ role: string, content: string }>
+    }> {
+        try {
+            const response = await fetch("https://modelslab.com/api/v6/llm/uncensored_chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    key: this.apiKey,
+                    messages: conversation,
+                    max_tokens: maxTokens
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`ModelsLab API error: ${response.status} - ${JSON.stringify(errorData)}`);
+            }
+
+            const data = await response.json();
+
+            if (data.status !== "success") {
+                throw new Error(`ModelsLab API error: ${data.message || "Unknown error"}`);
+            }
+
+            // Add the assistant's response to the conversation
+            const updatedConversation = [...conversation, {
+                role: "assistant",
+                content: data.message
+            }];
+
+            return {
+                message: data.message,
+                conversation: updatedConversation
+            };
+        } catch (error) {
+            console.error("Error continuing conversation with ModelsLab API:", error);
+            throw error;
+        }
     }
 }
 
@@ -79,7 +171,7 @@ export async function generateWithProvider({
         return await client.generateCompletion({
             prompt,
             systemPrompt,
-            format,
+            // format,
         })
     }
 
@@ -136,10 +228,11 @@ export const generateResumeContent = async (
             provider,
             prompt,
             systemPrompt: "You are a professional resume writer who creates compelling, ATS-friendly resumes.",
-            format: "json",
+            // format: "json",
         })
 
-        const content = JSON.parse(text)
+        // const content = JSON.parse(text)
+        const content = (text)
 
         // Calculate AI score based on content quality
         const aiScore = calculateAIScore(content)
@@ -211,9 +304,9 @@ const calculateAIScore = (content: any) => {
     } else if (content.summary) {
         score += 10
     }
-
+    console.log({content})
     // Check for quantifiable achievements in experience
-    const experienceText = JSON.stringify(content.experience)
+    const experienceText = JSON.stringify(content)
     if (experienceText.match(/increased|improved|reduced|achieved|led|managed|created/gi)) {
         score += 20
     }

@@ -23,6 +23,11 @@ import { generateResume } from "@/lib/actions";
 export default function ResumeBuilderPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [resumeData, setResumeData] = useState(null);
+  const [isDownloading, setIsDownloading] = useState({
+    pdf: false,
+    docx: false,
+  });
 
   // Form state
   const [personalInfo, setPersonalInfo] = useState({
@@ -46,21 +51,19 @@ export default function ResumeBuilderPage() {
 
   // Add state for selected AI provider
   const [selectedProvider, setSelectedProvider] =
-    useState<AIProviderId>("OPENAI");
+    useState<AIProviderId>("MODELSLAB");
 
-  const handleGenerateResume = () => {
+  const handleGenerateResume = async () => {
     setIsGenerating(true);
 
-    // Create FormData with all the resume information
-    const formData = new FormData();
-    formData.append("personalInfo", JSON.stringify(personalInfo));
-    formData.append("experiences", JSON.stringify(experiences));
-    formData.append("education", JSON.stringify(education));
-    formData.append("skills", skills);
-    formData.append("aiProvider", selectedProvider);
-
     // Submit the form data to the server action
-    generateResume(formData)
+    await generateResume({
+      personalInfo,
+      experiences,
+      education,
+      skills,
+      selectedProvider,
+    })
       .then((result) => {
         if (result.error) {
           // Handle error
@@ -68,6 +71,7 @@ export default function ResumeBuilderPage() {
           // Show error message to user
         } else {
           // Show success and preview
+          // setResumeData(result.data);
           setShowPreview(true);
         }
       })
@@ -96,6 +100,110 @@ export default function ResumeBuilderPage() {
 
   const removeEducation = (index: number) => {
     setEducation(education.filter((_, i) => i !== index));
+  };
+
+  // Function to download resume as PDF
+  const handleDownloadPDF = async () => {
+    setIsDownloading((prev) => ({ ...prev, pdf: true }));
+
+    try {
+      // Create the data to send
+      const downloadData = {
+        personalInfo,
+        experiences,
+        education,
+        skills,
+        format: "pdf",
+      };
+
+      // Make API call to server to generate PDF
+      const response = await fetch("/api/download-resume", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(downloadData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate PDF");
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+
+      // Create a temporary anchor element and trigger download
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      a.download = `${personalInfo.name || "Resume"}_CV.pdf`;
+      document.body.appendChild(a);
+      a.click();
+
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      // Show error message to user
+    } finally {
+      setIsDownloading((prev) => ({ ...prev, pdf: false }));
+    }
+  };
+
+  // Function to download resume as DOCX
+  const handleDownloadDOCX = async () => {
+    setIsDownloading((prev) => ({ ...prev, docx: true }));
+
+    try {
+      // Create the data to send
+      const downloadData = {
+        personalInfo,
+        experiences,
+        education,
+        skills,
+        format: "docx",
+      };
+
+      // Make API call to server to generate DOCX
+      const response = await fetch("/api/download-resume", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(downloadData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate DOCX");
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+
+      // Create a temporary anchor element and trigger download
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      a.download = `${personalInfo.name || "Resume"}_CV.docx`;
+      document.body.appendChild(a);
+      a.click();
+
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Error downloading DOCX:", error);
+      // Show error message to user
+    } finally {
+      setIsDownloading((prev) => ({ ...prev, docx: false }));
+    }
   };
 
   return (
@@ -531,12 +639,30 @@ export default function ResumeBuilderPage() {
                       {personalInfo.name || "John Doe"}
                     </h2>
                     <div className="flex space-x-4">
-                      <Button variant="outline" size="sm">
-                        <FileDown className="h-4 w-4 mr-2" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadPDF}
+                        disabled={isDownloading.pdf}
+                      >
+                        {isDownloading.pdf ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileDown className="h-4 w-4 mr-2" />
+                        )}
                         Download PDF
                       </Button>
-                      <Button variant="outline" size="sm">
-                        <FileDown className="h-4 w-4 mr-2" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadDOCX}
+                        disabled={isDownloading.docx}
+                      >
+                        {isDownloading.docx ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileDown className="h-4 w-4 mr-2" />
+                        )}
                         Download DOCX
                       </Button>
                     </div>
