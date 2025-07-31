@@ -1,7 +1,6 @@
 "use server"
 
-import { signIn } from "@/auth"
-import { AuthError } from "next-auth"
+import { signIn } from "next-auth/react"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 
@@ -26,17 +25,9 @@ export async function login(formData: FormData) {
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { error: error.errors[0].message }
+      return { error: error.issues[0].message }
     }
 
-    if (error instanceof AuthError) {
-      switch (error.type) {
-        case "CredentialsSignin":
-          return { error: "Invalid credentials" }
-        default:
-          return { error: "Something went wrong. Please try again." }
-      }
-    }
 
     return { error: "Something went wrong. Please try again." }
   }

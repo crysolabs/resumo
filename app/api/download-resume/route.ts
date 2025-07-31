@@ -1,18 +1,45 @@
 // File: app/api/download-resume/route.ts
 import { NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
-declare module 'officegen' {
-    const officegen: (type: string) => any;
-    export default officegen;
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
+
+interface PersonalInfo {
+    name?: string;
+    title?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    summary?: string;
 }
-import officegen from 'officegen';
-import { Readable } from 'stream';
-export async function POST(request) {
+
+interface Experience {
+    title?: string;
+    company?: string;
+    startDate?: string;
+    endDate?: string;
+    description?: string;
+}
+
+interface Education {
+    degree?: string;
+    field?: string;
+    school?: string;
+    startDate?: string;
+    endDate?: string;
+}
+
+export async function POST(request: Request) {
     try {
         const data = await request.json();
-        const { personalInfo, experiences, education, skills, format } = data;
+        const { personalInfo, experiences, education, skills, format }: {
+            personalInfo: PersonalInfo;
+            experiences: Experience[];
+            education: Education[];
+            skills: string;
+            format: string;
+        } = data;
 
-        let buffer;
+        let buffer: Buffer;
 
         if (format === 'pdf') {
             buffer = await generatePDF(personalInfo, experiences, education, skills);
@@ -48,18 +75,19 @@ export async function POST(request) {
 }
 
 // Function to generate PDF
-async function generatePDF(personalInfo, experiences, education, skills) {
+async function generatePDF(personalInfo: PersonalInfo, experiences: Experience[], education: Education[], skills: string): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         // Create a buffer to store PDF data
-        const buffers = [];
+        const buffers: Buffer[] = [];
         const doc = new PDFDocument({ margin: 50 });
 
         // Direct output to buffers
-        doc.on('data', buffers.push.bind(buffers));
+        doc.on('data', (chunk: Buffer) => buffers.push(chunk));
         doc.on('end', () => {
             const buffer = Buffer.concat(buffers);
             resolve(buffer);
         });
+        doc.on('error', reject);
 
         // Header/Contact information
         doc.fontSize(24).text(personalInfo.name || 'John Doe', { align: 'center' });
@@ -72,12 +100,12 @@ async function generatePDF(personalInfo, experiences, education, skills) {
             personalInfo.location || 'City, State'
         ].join(' | ');
         doc.fontSize(10).text(contactText, { align: 'center' });
-        
+
         // Professional Summary
         doc.moveDown();
         doc.fontSize(16).text('Professional Summary', { underline: true });
         doc.fontSize(10).text(personalInfo.summary || 'Professional with experience in the industry.');
-        
+
         // Experience
         doc.moveDown(2);
         doc.fontSize(16).text('Experience', { underline: true });
@@ -87,7 +115,7 @@ async function generatePDF(personalInfo, experiences, education, skills) {
             doc.fontSize(10).font('Helvetica').text(`${exp.company || 'Company'} | ${exp.startDate || 'Start Date'} - ${exp.endDate || 'End Date'}`);
             doc.fontSize(10).text(exp.description || 'Job description');
         });
-        
+
         // Education
         doc.moveDown(2);
         doc.fontSize(16).text('Education', { underline: true });
@@ -96,102 +124,218 @@ async function generatePDF(personalInfo, experiences, education, skills) {
             doc.fontSize(12).font('Helvetica-Bold').text(`${edu.degree || 'Degree'} in ${edu.field || 'Field'}`);
             doc.fontSize(10).font('Helvetica').text(`${edu.school || 'School'} | ${edu.startDate || 'Start Date'} - ${edu.endDate || 'End Date'}`);
         });
-        
+
         // Skills
         doc.moveDown(2);
         doc.fontSize(16).text('Skills', { underline: true });
         doc.fontSize(10).text(skills || 'Skills list');
-        
+
         doc.end();
     });
 }
 
-// Function to generate DOCX
-async function generateDOCX(personalInfo, experiences, education, skills) {
-    return new Promise((resolve, reject) => {
-        // Create a new docx document
-        const docx = officegen('docx');
-        const buffers = [];
+// Function to generate DOCX using the modern 'docx' package
+async function generateDOCX(personalInfo: PersonalInfo, experiences: Experience[], education: Education[], skills: string): Promise<Buffer> {
+    try {
+        // Create document sections
+        const children: Paragraph[] = [];
 
-        // Setup error handling
-        docx.on('error', (err) => {
-            reject(err);
-        });
+        // Header with name and title
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: personalInfo.name || 'John Doe',
+                        bold: true,
+                        size: 48, // 24pt in half-points
+                    }),
+                ],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 200 },
+            }),
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: personalInfo.title || 'Professional Title',
+                        size: 28, // 14pt in half-points
+                    }),
+                ],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 },
+            })
+        );
 
-        // When document is created
-        const stream = new Readable();
-        stream._read = () => { };
-
-        docx.on('finalize', () => {
-            const buffer = Buffer.concat(buffers);
-            resolve(buffer);
-        });
-
-        stream.on('data', (chunk) => {
-            buffers.push(chunk);
-        });
-
-        // Add header with name and title
-        let header = docx.createP();
-        header.addText(personalInfo.name || 'John Doe', { font_size: 24, align: 'center', bold: true });
-        header.addLineBreak();
-        header.addText(personalInfo.title || 'Professional Title', { font_size: 14, align: 'center' });
-        header.addLineBreak();
-
-        // Add contact information
-        let contact = docx.createP({ align: 'center' });
-        contact.addText([
+        // Contact information
+        const contactText = [
             personalInfo.email || 'email@example.com',
             personalInfo.phone || '(123) 456-7890',
             personalInfo.location || 'City, State'
-        ].join(' | '), { font_size: 10 });
+        ].join(' | ');
+
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: contactText,
+                        size: 20, // 10pt in half-points
+                    }),
+                ],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 },
+            })
+        );
 
         // Professional Summary
-        let summaryHeader = docx.createP();
-        summaryHeader.addText('Professional Summary', { font_size: 16, bold: true });
-        summaryHeader.addHorizontalLine();
-
-        let summary = docx.createP();
-        summary.addText(personalInfo.summary || 'Professional with experience in the industry.', { font_size: 10 });
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: 'Professional Summary',
+                        bold: true,
+                        size: 32, // 16pt in half-points
+                        underline: {},
+                    }),
+                ],
+                spacing: { before: 400, after: 200 },
+            }),
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: personalInfo.summary || 'Professional with experience in the industry.',
+                        size: 20, // 10pt in half-points
+                    }),
+                ],
+                spacing: { after: 400 },
+            })
+        );
 
         // Experience
-        let expHeader = docx.createP();
-        expHeader.addText('Experience', { font_size: 16, bold: true });
-        expHeader.addHorizontalLine();
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: 'Experience',
+                        bold: true,
+                        size: 32, // 16pt in half-points
+                        underline: {},
+                    }),
+                ],
+                spacing: { before: 400, after: 200 },
+            })
+        );
 
         experiences.forEach((exp) => {
-            let expTitle = docx.createP();
-            expTitle.addText(exp.title || 'Job Title', { font_size: 12, bold: true });
-
-            let expDetails = docx.createP();
-            expDetails.addText(`${exp.company || 'Company'} | ${exp.startDate || 'Start Date'} - ${exp.endDate || 'End Date'}`, { font_size: 10 });
-
-            let expDesc = docx.createP();
-            expDesc.addText(exp.description || 'Job description', { font_size: 10 });
+            children.push(
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: exp.title || 'Job Title',
+                            bold: true,
+                            size: 24, // 12pt in half-points
+                        }),
+                    ],
+                    spacing: { before: 200, after: 100 },
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `${exp.company || 'Company'} | ${exp.startDate || 'Start Date'} - ${exp.endDate || 'End Date'}`,
+                            size: 20, // 10pt in half-points
+                        }),
+                    ],
+                    spacing: { after: 100 },
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: exp.description || 'Job description',
+                            size: 20, // 10pt in half-points
+                        }),
+                    ],
+                    spacing: { after: 200 },
+                })
+            );
         });
 
         // Education
-        let eduHeader = docx.createP();
-        eduHeader.addText('Education', { font_size: 16, bold: true });
-        eduHeader.addHorizontalLine();
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: 'Education',
+                        bold: true,
+                        size: 32, // 16pt in half-points
+                        underline: {},
+                    }),
+                ],
+                spacing: { before: 400, after: 200 },
+            })
+        );
 
         education.forEach((edu) => {
-            let eduTitle = docx.createP();
-            eduTitle.addText(`${edu.degree || 'Degree'} in ${edu.field || 'Field'}`, { font_size: 12, bold: true });
-
-            let eduDetails = docx.createP();
-            eduDetails.addText(`${edu.school || 'School'} | ${edu.startDate || 'Start Date'} - ${edu.endDate || 'End Date'}`, { font_size: 10 });
+            children.push(
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `${edu.degree || 'Degree'} in ${edu.field || 'Field'}`,
+                            bold: true,
+                            size: 24, // 12pt in half-points
+                        }),
+                    ],
+                    spacing: { before: 200, after: 100 },
+                }),
+                new Paragraph({
+                    children: [
+                        new TextRun({
+                            text: `${edu.school || 'School'} | ${edu.startDate || 'Start Date'} - ${edu.endDate || 'End Date'}`,
+                            size: 20, // 10pt in half-points
+                        }),
+                    ],
+                    spacing: { after: 200 },
+                })
+            );
         });
 
         // Skills
-        let skillsHeader = docx.createP();
-        skillsHeader.addText('Skills', { font_size: 16, bold: true });
-        skillsHeader.addHorizontalLine();
+        children.push(
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: 'Skills',
+                        bold: true,
+                        size: 32, // 16pt in half-points
+                        underline: {},
+                    }),
+                ],
+                spacing: { before: 400, after: 200 },
+            }),
+            new Paragraph({
+                children: [
+                    new TextRun({
+                        text: skills || 'Skills list',
+                        size: 20, // 10pt in half-points
+                    }),
+                ],
+                spacing: { after: 200 },
+            })
+        );
 
-        let skillsList = docx.createP();
-        skillsList.addText(skills || 'Skills list', { font_size: 10 });
+        // Create the document
+        const doc = new Document({
+            sections: [
+                {
+                    properties: {},
+                    children: children,
+                },
+            ],
+        });
 
-        // Generate the document
-        docx.generate(stream);
-    });
+        // Generate buffer
+        const buffer = await Packer.toBuffer(doc);
+        return buffer;
+
+    } catch (error) {
+        console.error('Error generating DOCX:', error);
+        throw new Error('Failed to generate DOCX document');
+    }
 }

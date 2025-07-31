@@ -28,6 +28,9 @@ export async function createCheckoutSession(priceId: string) {
     let customerId = await getStripeCustomerByUserId(user.id)
 
     if (!customerId) {
+      if (!user.email) {
+        return { error: "User email is required" }
+      }
       customerId = await createStripeCustomer(user.email, user.name || undefined)
 
       // Create subscription record if it doesn't exist

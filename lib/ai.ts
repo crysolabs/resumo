@@ -1,6 +1,6 @@
+import { AIProviderId, getDefaultProvider } from "./ai-providers";
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
-import { type AIProviderId, getDefaultProvider } from "./ai-providers"
 
 // ModelsLab API client (simplified implementation)
 class ModelsLabClient {
@@ -133,6 +133,139 @@ class ModelsLabClient {
     }
 }
 
+// Ollama API client
+class OllamaClient {
+    private endpoint: string;
+    private model: string;
+
+    constructor(endpoint: string, model: string = "llama2") {
+        this.endpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+        this.model = model;
+    }
+
+    /**
+     * Generate a response using the Ollama API
+     * @param options.prompt The user message to send
+     * @param options.systemPrompt Optional system prompt to set context
+     * @param options.maxTokens Maximum number of tokens in the response (not used by Ollama)
+     * @param options.previousMessages Optional previous conversation history
+     * @returns The generated response text
+     */
+    async generateCompletion(options: {
+        prompt: string;
+        systemPrompt?: string;
+        maxTokens?: number;
+        previousMessages?: Array<{ role: string, content: string }>;
+    }): Promise<string> {
+        const { prompt, systemPrompt, previousMessages = [] } = options;
+
+        // Construct messages array according to the API format
+        const messages = [];
+
+        // Add system message if provided
+        if (systemPrompt) {
+            messages.push({
+                role: "system",
+                content: systemPrompt
+            });
+        }
+
+        // Add previous messages if any
+        if (previousMessages.length > 0) {
+            messages.push(...previousMessages);
+        }
+
+        // Add the current user prompt
+        messages.push({
+            role: "user",
+            content: prompt
+        });
+
+        try {
+            const response = await fetch(`${this.endpoint}/api/chat`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    model: this.model,
+                    messages: messages,
+                    stream: false
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`Ollama API error: ${response.status} - ${JSON.stringify(errorData)}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.message || !data.message.content) {
+                throw new Error(`Ollama API error: Invalid response format`);
+            }
+
+            return data.message.content;
+        } catch (error) {
+            console.error("Error calling Ollama API:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Continue a conversation with the Ollama API
+     * @param conversation Array of message objects with role and content
+     * @param maxTokens Maximum number of tokens in the response (not used by Ollama)
+     * @returns The full API response including the new assistant message
+     */
+    async continueConversation(
+        conversation: Array<{ role: string, content: string }>,
+        maxTokens: number = 1000
+    ): Promise<{
+        message: string,
+        conversation: Array<{ role: string, content: string }>
+    }> {
+        try {
+            const response = await fetch(`${this.endpoint}/api/chat`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    model: this.model,
+                    messages: conversation,
+                    stream: false
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`Ollama API error: ${response.status} - ${JSON.stringify(errorData)}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.message || !data.message.content) {
+                throw new Error(`Ollama API error: Invalid response format`);
+            }
+
+            // Add the assistant's response to the conversation
+            const updatedConversation = [...conversation, {
+                role: "assistant",
+                content: data.message.content
+            }];
+
+            return {
+                message: data.message.content,
+                conversation: updatedConversation
+            };
+        } catch (error) {
+            console.error("Error continuing conversation with Ollama API:", error);
+            throw error;
+        }
+    }
+}
+
 // Get ModelsLab client instance
 function getModelsLabClient() {
     const apiKey = process.env.MODELSLAB_API_KEY
@@ -140,6 +273,16 @@ function getModelsLabClient() {
         throw new Error("ModelsLab API key not found")
     }
     return new ModelsLabClient(apiKey)
+}
+
+// Get Ollama client instance
+function getOllamaClient() {
+    const endpoint = process.env.OLLAMA_API_ENDPOINT
+    if (!endpoint) {
+        throw new Error("Ollama API endpoint not found")
+    }
+    const model = process.env.OLLAMA_MODEL || "llama2"
+    return new OllamaClient(endpoint, model)
 }
 
 // Generate text with the specified provider
@@ -168,6 +311,16 @@ export async function generateWithProvider({
     // Use ModelsLab
     if (provider === "MODELSLAB") {
         const client = getModelsLabClient()
+        return await client.generateCompletion({
+            prompt,
+            systemPrompt,
+            // format,
+        })
+    }
+
+    // Use Ollama
+    if (provider === "OLLAMA") {
+        const client = getOllamaClient()
         return await client.generateCompletion({
             prompt,
             systemPrompt,
@@ -304,7 +457,7 @@ const calculateAIScore = (content: any) => {
     } else if (content.summary) {
         score += 10
     }
-    console.log({content})
+    console.log({ content })
     // Check for quantifiable achievements in experience
     const experienceText = JSON.stringify(content)
     if (experienceText.match(/increased|improved|reduced|achieved|led|managed|created/gi)) {
@@ -332,4 +485,3 @@ const calculateAIScore = (content: any) => {
 
     return Math.min(score, 100) // Cap at 100
 }
-

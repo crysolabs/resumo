@@ -108,7 +108,7 @@ export async function generateCoverLetter(formData: FormData) {
     console.error("Error generating cover letter:", error)
 
     if (error instanceof z.ZodError) {
-      return { error: error.errors[0].message }
+      return { error: error.issues[0].message }
     }
 
     return { error: "Failed to generate cover letter. Please try again." }

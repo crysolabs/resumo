@@ -55,7 +55,7 @@ export async function register(formData: FormData) {
     redirect("/login?registered=true")
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { error: error.errors[0].message }
+      return { error: error.issues[0].message }
     }
 
     return { error: "Something went wrong. Please try again." }

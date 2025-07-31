@@ -78,7 +78,7 @@ export async function saveResume(formData: FormData) {
     console.error("Error saving resume:", error)
 
     if (error instanceof z.ZodError) {
-      return { error: error.errors[0].message }
+      return { error: error.issues[0].message }
     }
 
     return { error: "Failed to save resume. Please try again." }

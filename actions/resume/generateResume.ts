@@ -72,7 +72,7 @@ export async function generateResume({
     endDate: string;
   }[],
   skills: string,
-  selectedProvider: "OPENAI" | "MODELSLAB"
+    selectedProvider: "OPENAI" | "MODELSLAB" | "OLLAMA"
 }) {
   try {
     const session = await getServerSession(authOptions)
@@ -163,7 +163,7 @@ export async function generateResume({
     console.error("Error generating resume:", error instanceof Error ? error.message : String(error))
 
     if (error instanceof z.ZodError) {
-      return { error: error.errors[0].message }
+      return { error: error.issues[0].message }
     }
 
     return { error: "Failed to generate resume. Please try again." }

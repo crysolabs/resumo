@@ -88,7 +88,7 @@ export async function saveCoverLetter(formData: FormData) {
     console.error("Error saving cover letter:", error)
 
     if (error instanceof z.ZodError) {
-      return { error: error.errors[0].message }
+      return { error: error.issues[0].message }
     }
 
     return { error: "Failed to save cover letter. Please try again." }
