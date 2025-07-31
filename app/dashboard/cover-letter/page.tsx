@@ -244,27 +244,6 @@ export default function CoverLetterPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-2 mb-4">
-                <h3 className="text-lg font-medium">AI Provider</h3>
-                <p className="text-sm text-muted-foreground">
-                  Select which AI model to use for generating your cover letter
-                </p>
-              </div>
-              <RadioGroup defaultValue="openai" name="aiProvider">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="openai" id="openai-cl" />
-                  <Label htmlFor="openai-cl">OpenAI (ChatGPT)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="modelslab" id="modelslab-cl" />
-                  <Label htmlFor="modelslab-cl">ModelsLab</Label>
-                </div>
-              </RadioGroup>
-            </CardContent>
-          </Card>
-
           <div className="flex justify-between items-center">
             <AIProviderSelector
               onProviderChange={(provider) => setSelectedProvider(provider)}
